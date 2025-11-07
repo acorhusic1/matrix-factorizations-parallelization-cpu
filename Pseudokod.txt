@@ -1,0 +1,30 @@
+ULAZ:
+    A — kvadratna matrica dimenzija n×n
+
+IZLAZ:
+    L — donja trokutasta matrica
+    U — gornja trokutasta matrica
+
+ALGORITAM:
+
+1. Inicijalizuj L i U na 0
+
+2. Za i = 0 do n-1 uradi:
+      // Izračunaj elemente gornje matrice U
+      Za j = i do n-1 uradi:
+          sum = 0
+          Za k = 0 do i-1 uradi:
+              sum = sum + L[i][k] * U[k][j]
+          U[i][j] = A[i][j] - sum
+
+      // Izračunaj elemente donje matrice L
+      Za j = i do n-1 uradi:
+          Ako i == j:
+              L[i][j] = 1
+          Inače:
+              sum = 0
+              Za k = 0 do i-1 uradi:
+                  sum = sum + L[j][k] * U[k][i]
+              L[j][i] = (A[j][i] - sum) / U[i][i]
+
+3. Kraj
