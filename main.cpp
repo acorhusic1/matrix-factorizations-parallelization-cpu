@@ -1,128 +1,148 @@
-// main.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
+﻿#include "QR_sekvencijalna.h"
+#include <iostream>
+#include <chrono>
+#include <cstdlib>
+#include <ctime>
 
-#include "QR_naivna.h"
+std::vector<double> GenerateRandomMatrix(int rows, int cols) {
+    std::vector<double> m(rows * cols);
+    // Postavlja elemente iz opsega [-100, 100]
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            m[i * cols + j] = (double)rand() / RAND_MAX * 200.0 - 100.0;
+        }
+    }
+    return m;
+}
+
+void CreateMatrixFromList(std::initializer_list<std::vector<double>> l, std::vector<double>& M, int& rows, int& cols) {
+    if (l.size() == 0) throw std::range_error("Bad dimension");
+    rows = l.size();
+    cols = l.begin()->size();
+    if (cols == 0) throw std::range_error("Bad dimension");
+    M.resize(rows * cols);
+
+    int k = 0;
+    for (const auto& red : l) {
+        if ((int)red.size() != cols) throw std::logic_error("Bad matrix");
+        for (double val : red) {
+            M[k++] = val;
+        }
+    }
+}
 
 int main() {
+
+    // Postavi seed za random brojeve i preciznost ispisa
+    srand(time(0));
+    std::cout << std::fixed << std::setprecision(8);
+    const double CHECK_EPS = 1e-6; // Epsilon za provjeru jednakosti A = Q*R
+
+    // --- Test validacije (3x3 matrica) ---
+    std::cout << "\n--- Test 3x3 Matrice i QR Faktorizacije (REKONSTRUKCIJA A = Q * R) ---" << std::endl;
+
+    // Matrica A za koju se računa Q i R
+    std::vector<double> A_small_vec;
+    int Arows, Acols;
+    CreateMatrixFromList({ {0, 3, 2}, {4, 6, 1}, {3, 1, 7} }, A_small_vec, Arows, Acols);
+
     try {
-        std::cout << "--- Testovi klasa Vector i Matrix ---" << std::endl;
-        Vector v1{ 1, 2, 3 };
-        Matrix m1{ {1, 2, 3}, {4, 5, 6}, {7, 8, 10} };
-        std::cout << "Originalna matrica m1:" << std::endl;
-        m1.Print();
-        Matrix m1_inv = Inverse(m1);
-        std::cout << "Inverzna matrica m1:" << std::endl;
-        m1_inv.Print();
-        Matrix jedinicna = m1 * m1_inv;
-        std::cout << "Proizvod m1 * m1_inv (trebala bi biti jedinicna):" << std::endl;
-        jedinicna.Chop(1e-10); // "Ocisti" male greske
-        jedinicna.Print();
+        std::cout << "Originalna matrica A (3x3):" << std::endl;
+        MatrixPrint(A_small_vec, Arows, Acols);
 
-        Matrix m_div = jedinicna / m1;
-        std::cout << "Rezultat jedinicna / m1 (trebao bi biti inverz od m1):" << std::endl;
-        m_div.Print();
+        // Izracunavanje Q i R
+        std::vector<double> QRmat, R_diag;
+        QRFactorization(A_small_vec, Arows, Acols, QRmat, R_diag);
 
-        Matrix singularna{ {1, 2, 3}, {2, 4, 6}, {5, 6, 7} };
-        std::cout << "Determinanta singularne matrice: " << Det(singularna) << std::endl;
-        try {
-            Inverse(singularna);
-        }
-        catch (const std::domain_error& e) {
-            std::cout << "Ocekivan izuzetak za inverz singularne: " << e.what() << std::endl;
-        }
-    }
-    catch (const std::exception& e) {
-        std::cout << "Neocekivan izuzetak u osnovnim testovima: " << e.what() << std::endl;
-    }
+        std::vector<double> Q = GetQ(QRmat, Arows, Acols);
+        std::vector<double> R = GetR(QRmat, R_diag, Arows, Acols);
 
-    std::cout << "\n--- Test klase QRDecomposer ---" << std::endl;
-    try {
-        Matrix A{ {0, 3, 2}, {4, 6, 1}, {3, 1, 7} }; // Matrica sa a[0][0]=0
-        std::cout << "Originalna matrica A:" << std::endl;
-        A.Print();
+        std::cout << "\nMatrica Q (Ortogonalna):" << std::endl;
+        MatrixPrint(Q, Arows, Acols);
+        std::cout << "\nMatrica R (Gornje trougaona):" << std::endl;
+        MatrixPrint(R, Arows, Acols);
 
-        QRDecomposer qr(A);
+        // Rekonstrukcija A = Q * R
+        std::vector<double> A_reconstructed = MatrixMultiply(Q, Arows, Acols, R, Arows, Acols);
+        std::cout << "\nRekonstruisana matrica Q * R (Provjera):" << std::endl;
+        MatrixPrint(A_reconstructed, Arows, Acols);
 
-        Matrix Q = qr.GetQ();
-        Matrix R = qr.GetR();
-
-        std::cout << "Matrica Q:" << std::endl;
-        Q.Print();
-        std::cout << "Matrica R:" << std::endl;
-        R.Print();
-
-        Matrix A_reconstructed = Q * R;
-        std::cout << "Rekonstruisana matrica Q * R:" << std::endl;
-        A_reconstructed.Print();
-
-        if (A.EqualTo(A_reconstructed, 1e-9)) {
-            std::cout << "Test USPJESAN: Q * R je jednako A." << std::endl;
+        if (MatrixEqualTo(A_small_vec, Arows, Acols, A_reconstructed, Arows, Acols, CHECK_EPS)) {
+            std::cout << "\n-> Rekonstrukcija USPJESNA: Q * R je jednako A." << std::endl;
         }
         else {
-            std::cout << "Test NEUSPJESAN: Q * R nije jednako A." << std::endl;
+            std::cout << "\n-> Rekonstrukcija NEUSPJESNA: Q * R nije jednako A." << std::endl;
         }
 
-        // Test rjesavanja sistema Ax = b
-        Vector b{ 10, 11, 20 };
-        Vector x = qr.Solve(b);
-        std::cout << "\nRjesavamo sistem Ax=b za b = ";
-        b.Print(' ');
-        std::cout << "\nRjesenje x je: ";
-        x.Print(' ');
-        std::cout << "\nProvjera A*x: ";
-        (A * x).Print(' ');
-        std::cout << std::endl;
-        if (b.EqualTo(A * x, 1e-9)) {
-            std::cout << "Test USPJESAN: Rjesenje sistema je tacno." << std::endl;
-        }
-        else {
-            std::cout << "Test NEUSPJESAN: Rjesenje sistema nije tacno." << std::endl;
-        }
-
-
-        // Test sa singularnom matricom
-        try {
-            Matrix singularna{ {1, 2, 3}, {2, 4, 6}, {7, 8, 1} };
-            QRDecomposer test(singularna);
-        }
-        catch (const std::domain_error& e) {
-            std::cout << "\nOVO JE OCEKIVAN IZUZETAK za singularnu matricu! Detalji: " << e.what() << std::endl;
-        }
-
-        // Test sa neispravnim formatom
-        try {
-            Matrix neispravna{ {1, 2, 3}, {4, 5, 6} }; // redova < kolona
-            QRDecomposer test(neispravna);
-        }
-        catch (const std::domain_error& e) {
-            std::cout << "OVO JE OCEKIVAN IZUZETAK za neispravan format! Detalji: " << e.what() << std::endl;
-        }
-
-        // Test MulQWith i MulQTWith
-        Vector v{ 1, 2, 3 };
-        std::cout << "\nTest MulQTWith(v): ";
-        qr.MulQTWith(v).Print(' ');
-        std::cout << std::endl;
-
-
-    }
-    catch (const std::domain_error& e) {
-        std::cout << "Neocekivan domain_error izuzetak u QR testovima: " << e.what() << std::endl;
     }
     catch (const std::exception& e) {
-        std::cout << "Neocekivan izuzetak u QR testovima: " << e.what() << std::endl;
+        std::cout << "\nIzuzetak u validacionom testu: " << e.what() << std::endl;
     }
+
+
+    // --- Test performansi ---
+    const int N = 1000;
+    const int TEST_RUNS = 10;
+    std::cout << "\n\n--- Test performansi (" << N << "x" << N << " matrica) ---" << std::endl;
+
+    double total_duration = 0.0;
+    int failed_checks = 0; // Brojač pogrešnih rezultata
+
+    for (int i = 0; i < TEST_RUNS; ++i) {
+        std::vector<double> A_large = GenerateRandomMatrix(N, N);
+        std::vector<double> QRmat, R_diag;
+
+        // --- START TIMING (Samo QR faktorizacija) ---
+        auto start = std::chrono::high_resolution_clock::now();
+
+        try {
+            QRFactorization(A_large, N, N, QRmat, R_diag);
+        }
+        catch (const std::exception& e) {
+            std::cerr << "Upozorenje: Pokretanje " << i + 1 << " preskočeno zbog izuzetka: " << e.what() << std::endl;
+            // Preskočene izuzetke (singularne matrice) ne računamo ni u uspjeh ni u neuspjeh testa
+            continue;
+        }
+
+        auto end = std::chrono::high_resolution_clock::now();
+        // --- END TIMING ---
+        std::chrono::duration<double> duration = end - start;
+
+        total_duration += duration.count();
+        std::cout << "Pokretanje " << i + 1 << ": " << duration.count() * 1000.0 << " ms. ";
+
+        // --- PROVJERA REKONSTRUKCIJE (NE ULAZI U VRIJEME) ---
+        try {
+            std::vector<double> Q = GetQ(QRmat, N, N);
+            std::vector<double> R = GetR(QRmat, R_diag, N, N);
+            std::vector<double> A_reconstructed = MatrixMultiply(Q, N, N, R, N, N);
+
+            if (MatrixEqualTo(A_large, N, N, A_reconstructed, N, N, CHECK_EPS)) {
+                std::cout << "Rezultat ispravan." << std::endl;
+            }
+            else {
+                std::cout << "Pogresan rezultat." << std::endl;
+                failed_checks++;
+            }
+        }
+        catch (const std::exception& e) {
+            std::cerr << "Provjera rekonstrukcije neuspješna zbog izuzetka: " << e.what() << std::endl;
+            failed_checks++; // Računaj kao neuspjeh
+        }
+    }
+
+    // --- Ispis konačnih rezultata ---
+    double mean_duration = total_duration / (TEST_RUNS - (double)failed_checks);
+    if (TEST_RUNS - failed_checks == 0) mean_duration = 0; // Izbjegavanje dijeljenja s nulom
+
+    std::cout << "\n------------------------------------------------------------" << std::endl;
+    std::cout << "Srednje vrijeme (MEAN) QR faktorizacije: " << mean_duration * 1000.0 << " ms" << std::endl;
+
+    double failure_rate = (double)failed_checks / TEST_RUNS * 100.0;
+    std::cout << "Ukupan broj pokretanja: " << TEST_RUNS << std::endl;
+    std::cout << "Broj pogresnih rezultata (A != Q*R): " << failed_checks << std::endl;
+    std::cout << "Postotak pogresnih izracunavanja: " << failure_rate << " %" << std::endl;
+    std::cout << "------------------------------------------------------------" << std::endl;
 
     return 0;
 }
-
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file

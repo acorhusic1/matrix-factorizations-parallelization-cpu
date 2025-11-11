@@ -1,7 +1,5 @@
 #include "QR_naivna.h"
 
-// --- Implementacije za Vector ---
-// ... (Ovaj dio je nepromijenjen i ispravan, pa ga preska?emo radi preglednosti) ...
 void Vector::TestirajDimenzije(const Vector& v1, const Vector& v2) {
     if (v1.NElems() != v2.NElems())
         throw std::domain_error("Incompatible formats");
