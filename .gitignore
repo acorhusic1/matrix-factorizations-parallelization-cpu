@@ -1,45 +1,28 @@
-# Korisničke postavke Visual Studija
-*.suo
-*.user
-*.userosscache
-*.sln.docstates
-
-# Folder sa kešom i postavkama Visual Studija
-# Ovo je glavni uzrok vaših velikih fajlova!
-.vs/
-
-# Build output
-[Bb]in/
-[Bb]j/
-[Rr]elease/
-[Rr]elease*/
-[Dd]ebug/
-[Dd]ebug*/
-x64/
-[Aa]rm64/
-bld/
-.vspscc
-
-# Fajlovi generisani tokom build-a
-*.lib
-*.dll
+# --- Executables and Object Files ---
+# Ignorisi izvršne fajlove
 *.exe
-*.pdb
-*.ipch
+a.out
+main
+program
+
+# Ignorisi objektne fajlove
+*.o
 *.obj
+
+# Build direktoriji (ako se koriste)
+build/
+bin/
+
+PRSProjekat1/
+
+# --- Temporary/Debug Files ---
+# Ignorisi fajlove za debugiranje
+*.pdb
 *.ilk
-*.aps
-*.tlog
-*.log
-*.sbr
-*.res
 
-# NuGet paketi
-*.nupkg
-packages/
-*.[Pp]ackages.*
-*.[Cc]onfig
+# --- IDE/Editor Files (common) ---
+# Visual Studio Code
+.vscode/
 
-# Ostalo
-*.vcxproj.filters
-*.vcxproj.user
+# Visual Studio
+.vs/
