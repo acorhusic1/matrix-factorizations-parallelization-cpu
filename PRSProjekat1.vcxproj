@@ -128,9 +128,11 @@
     <ClCompile Include="QR_naivna.cpp" />
     <ClCompile Include="QR_sekvencijalna.cpp" />
     <ClCompile Include="QR_sekvencijalna.h" />
+    <ClCompile Include="QR_sekvencijalna_blokirana.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="QR_naivna.h" />
+    <ClInclude Include="QR_sekvencijalna_blokirana.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

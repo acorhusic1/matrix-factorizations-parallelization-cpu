@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="QR_naivna.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -27,9 +24,18 @@
     <ClCompile Include="QR_sekvencijalna.h">
       <Filter>Header Files</Filter>
     </ClCompile>
+    <ClCompile Include="QR_sekvencijalna_blokirana.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="QR_naivna.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="QR_sekvencijalna_blokirana.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

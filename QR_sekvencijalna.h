@@ -12,9 +12,12 @@ const double GLOBAL_EPSILON = 1e-12;
 
 // --- Pomoćne Inline Funkcije za Rad sa Matričnom Memorijom ---
 
-// Brz pristup elementu M[i][j] u Row-Major rasporedu.
-inline double& At(std::vector<double>& M, int cols, int i, int j) { return M[i * cols + j]; }
-inline const double& At(const std::vector<double>& M, int cols, int i, int j) { return M[i * cols + j]; }
+/*
+    Brz pristup elementu M[i][j] u Column-Major rasporedu. (KLJUČNA OPTIMIZACIJA ZA KEŠ)
+    Pristup: index = j * rows + i
+*/
+inline double& At(std::vector<double>& M, int rows, int i, int j) { return M[j * rows + i]; }
+inline const double& At(const std::vector<double>& M, int rows, int i, int j) { return M[j * rows + i]; }
 
 // --- Matrične Funkcije (Prototipi) ---
 
