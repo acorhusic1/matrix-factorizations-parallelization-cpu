@@ -4,6 +4,7 @@
 #include <chrono>
 #include <iostream>
 #include <omp.h>
+#include <cstdlib>
 #include <vector>
 #include <algorithm>
 #include <cstring>
@@ -83,7 +84,7 @@ void LU_optimizovana(double* A, double* L, double* U, int n)
 }
 
 
-void LU_blokovska(double* A, double* L, double* U, int n) {
+void LU_blokovska_V1(double* A, double* L, double* U, int n) {
     // B: veličina bloka (block size).
     int B = 96;
 
@@ -208,7 +209,7 @@ void LU_blokovska(double* A, double* L, double* U, int n) {
 }
 
 
-void LU_blokovska_optimizirana(double* A, double* L, double* U, int n) {
+void LU_blokovska_V2(double* A, double* L, double* U, int n) {
     const int B = 96;
     
     // Moramo imati kopiju jer radimo Schur update
@@ -326,108 +327,6 @@ void LU_blokovska_optimizirana(double* A, double* L, double* U, int n) {
 }
 
 
-// Još brža verzija sa AVX2 intrinsics (ako je dostupno)
-#ifdef __AVX2__
-void LU_AVX(double* A, double* L, double* U, int n) {
-    const int B = 128;
-    
-    std::memset(L, 0, n * n * sizeof(double));
-    std::memset(U, 0, n * n * sizeof(double));
-    
-    for (int kb = 0; kb < n; kb += B) {
-        int kend = std::min(kb + B, n);
-        
-        // Dijagonalni blok (isti kao gore)
-        for (int k = kb; k < kend; ++k) {
-            int kn = k * n;
-            for (int j = k; j < kend; ++j) {
-                double sum = 0.0;
-                for (int p = kb; p < k; ++p) 
-                    sum += L[kn + p] * U[p * n + j];
-                U[kn + j] = A[kn + j] - sum;
-            }
-            L[kn + k] = 1.0;
-            double inv_Ukk = 1.0 / U[kn + k];
-            for (int i = k + 1; i < kend; ++i) {
-                int in = i * n;
-                double sum = 0.0;
-                for (int p = kb; p < k; ++p) 
-                    sum += L[in + p] * U[p * n + k];
-                L[in + k] = (A[in + k] - sum) * inv_Ukk;
-            }
-        }
-        
-        // U blokovi - sa AVX
-        for (int colb = kend; colb < n; colb += B) {
-            int colend = std::min(colb + B, n);
-            for (int k = kb; k < kend; ++k) {
-                int kn = k * n;
-                int j = colb;
-                for (; j + 3 < colend; j += 4) {
-                    __m256d sum_vec = _mm256_setzero_pd();
-                    for (int p = kb; p < k; ++p) {
-                        __m256d Lkp_vec = _mm256_set1_pd(L[kn + p]);
-                        __m256d U_vec = _mm256_loadu_pd(&U[p * n + j]);
-                        sum_vec = _mm256_fmadd_pd(Lkp_vec, U_vec, sum_vec);
-                    }
-                    __m256d A_vec = _mm256_loadu_pd(&A[kn + j]);
-                    __m256d result = _mm256_sub_pd(A_vec, sum_vec);
-                    _mm256_storeu_pd(&U[kn + j], result);
-                }
-                for (; j < colend; ++j) {
-                    double sum = 0.0;
-                    for (int p = kb; p < k; ++p) 
-                        sum += L[kn + p] * U[p * n + j];
-                    U[kn + j] = A[kn + j] - sum;
-                }
-            }
-        }
-        
-        // L blokovi
-        for (int rowb = kend; rowb < n; rowb += B) {
-            int rowend = std::min(rowb + B, n);
-            for (int k = kb; k < kend; ++k) {
-                double inv_Ukk = 1.0 / U[k * n + k];
-                for (int i = rowb; i < rowend; ++i) {
-                    int in = i * n;
-                    double sum = 0.0;
-                    for (int p = kb; p < k; ++p) 
-                        sum += L[in + p] * U[p * n + k];
-                    L[in + k] = (A[in + k] - sum) * inv_Ukk;
-                }
-            }
-        }
-        
-        // Schur update sa AVX
-        const int SB = 64;
-        for (int ib = kend; ib < n; ib += SB) {
-            int iend = std::min(ib + SB, n);
-            for (int jb = kend; jb < n; jb += SB) {
-                int jend = std::min(jb + SB, n);
-                for (int p = kb; p < kend; ++p) {
-                    int pn = p * n;
-                    for (int i = ib; i < iend; ++i) {
-                        __m256d Lip_vec = _mm256_set1_pd(L[i * n + p]);
-                        int in = i * n;
-                        int j = jb;
-                        for (; j + 3 < jend; j += 4) {
-                            __m256d A_vec = _mm256_loadu_pd(&A[in + j]);
-                            __m256d U_vec = _mm256_loadu_pd(&U[pn + j]);
-                            __m256d result = _mm256_fnmadd_pd(Lip_vec, U_vec, A_vec);
-                            _mm256_storeu_pd(&A[in + j], result);
-                        }
-                        for (; j < jend; ++j) {
-                            A[in + j] -= L[i * n + p] * U[pn + j];
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-#endif
-
-
 
 // Funkcija za provjeru je li A = L*U
 bool checkLU(const std::vector<double>& A, const std::vector<double>& L, const std::vector<double>& U, int n, double tol = 1e-6) {
@@ -447,7 +346,7 @@ bool checkLU(const std::vector<double>& A, const std::vector<double>& L, const s
 }
 
 
-void LU_blokovska_omp(double* A, double* L, double* U, int n) {
+void LU_blokovska_V1_omp(double* A, double* L, double* U, int n) {
     int B = 96;
     std::vector<double> A_copy(A, A + n*n);
 
@@ -523,7 +422,7 @@ void LU_blokovska_omp(double* A, double* L, double* U, int n) {
 
 
 int main() {
-	int n = 1024;
+	int n = 2048;
     
 	std::vector<double> A(1LL * n * n);
 	std::vector<double> L(1LL * n * n);
@@ -534,7 +433,7 @@ int main() {
 		A[i] = (rand() % 100) / 10.0 + 1.0;
 
     // --- LU_naivna ---
-	/*auto t0 = std::chrono::high_resolution_clock::now();
+	auto t0 = std::chrono::high_resolution_clock::now();
 	LU_naivna(A.data(), L.data(), U.data(), n);
 	auto t1 = std::chrono::high_resolution_clock::now();
 	std::cout << "LU_naivna: " << std::chrono::duration<double>(t1 - t0).count() << " s\n";
@@ -544,7 +443,7 @@ int main() {
         std::cout << "LU_naivna verification: FAIL\n"; */
 
 	// --- LU_optimizovana ---
-	/*std::vector<double> A2 = A, L2(n * n), U2(n * n);
+	std::vector<double> A2 = A, L2(n * n), U2(n * n);
 	t0 = std::chrono::high_resolution_clock::now();
 	LU_optimizovana(A2.data(), L2.data(), U2.data(), n);
 	t1 = std::chrono::high_resolution_clock::now();
@@ -554,54 +453,44 @@ int main() {
     else 
         std::cout << "LU_optimizovana verification: FAIL\n"; */
 
-	// --- LU_blokovska ---
-	/*std::vector<double> A3 = A, L3(n * n), U3(n * n);
-	auto t0 = std::chrono::high_resolution_clock::now();
-	LU_blokovska(A3.data(), L3.data(), U3.data(), n);
-	auto t1 = std::chrono::high_resolution_clock::now();
-	std::cout << "LU_blokovska: " << std::chrono::duration<double>(t1 - t0).count() << " s\n";
+	// --- LU_blokovska_V1 ---
+	std::vector<double> A3 = A, L3(n * n), U3(n * n);
+	t0 = std::chrono::high_resolution_clock::now();
+	LU_blokovska_V1(A3.data(), L3.data(), U3.data(), n);
+	t1 = std::chrono::high_resolution_clock::now();
+	std::cout << "LU_blokovska_V1: " << std::chrono::duration<double>(t1 - t0).count() << " s\n";
     
     /*if (checkLU(A3, L3, U3, n))
-        std::cout << "LU_blokovska verification: PASS\n";
+        std::cout << "LU_blokovska_V1 verification: PASS\n";
     else 
-        std::cout << "LU_blokovska verification: FAIL\n";*/
+        std::cout << "LU_blokovska_V1 verification: FAIL\n";*/
 
 
-    /*std::vector<double> A4 = A, L4(n * n), U4(n * n);
+    std::vector<double> A4 = A, L4(n * n), U4(n * n);
 	t0 = std::chrono::high_resolution_clock::now();
-	LU_blokovska_omp(A4.data(), L4.data(), U4.data(), n);
+	LU_blokovska_V2(A4.data(), L4.data(), U4.data(), n);
 	t1 = std::chrono::high_resolution_clock::now();
-	std::cout << "LU_blokovska_omp: " << std::chrono::duration<double>(t1 - t0).count() << " s\n";
-    
-    /*if (checkLU(A4, L4, U4, n))
-        std::cout << "LU_blokovska verification: PASS\n";
-    else 
-        std::cout << "LU_blokovska verification: FAIL\n";*/
-
-    std::vector<double> A5 = A, L5(n * n), U5(n * n);
-	auto t0 = std::chrono::high_resolution_clock::now();
-	LU_blokovska_optimizirana(A5.data(), L5.data(), U5.data(), n);
-	auto t1 = std::chrono::high_resolution_clock::now();
-	std::cout << "LU_optimizirana: " << std::chrono::duration<double>(t1 - t0).count() << " s\n";
-    if (checkLU(A5, L5, U5, n))
+	std::cout << "LU_blokovska_V2: " << std::chrono::duration<double>(t1 - t0).count() << " s\n";
+    /* if (checkLU(A4, L4, U4, n))
         std::cout << "LU_optimizirana verification: PASS\n";
     else 
-        std::cout << "LU_optimizirana verification: FAIL\n";
+        std::cout << "LU_optimizirana verification: FAIL\n"; */
 
-    std::vector<double> A6 = A, L6(n * n), U6(n * n);
+
+    std::vector<double> A5 = A, L5(n * n), U5(n * n);
 	t0 = std::chrono::high_resolution_clock::now();
-	LU_AVX(A6.data(), L6.data(), U6.data(), n);
+	LU_blokovska_V1_omp(A5.data(), L5.data(), U5.data(), n);
 	t1 = std::chrono::high_resolution_clock::now();
-	std::cout << "LU_AVX: " << std::chrono::duration<double>(t1 - t0).count() << " s\n";
-        if (checkLU(A6, L6, U6, n))
-        std::cout << "LU_AVX verification: PASS\n";
+	std::cout << "LU_blokovska_V1_omp: " << std::chrono::duration<double>(t1 - t0).count() << " s\n";
+    
+    /* if (checkLU(A5, L5, U5, n))
+        std::cout << "LU_blokovska_V1_omp verification: PASS\n";
     else 
-        std::cout << "LU_AVX verification: FAIL\n";
-
+        std::cout << "LU_blokovska_V1_omp verification: FAIL\n"; */
 
 	/* for (int B : {16, 32, 64, 96, 128, 256}) {
 		auto start = std::chrono::high_resolution_clock::now();
-		LU_blokovska(A.data(), L.data(), U.data(), n, B);
+		LU_blokovska_V1(A.data(), L.data(), U.data(), n, B);
 		auto end = std::chrono::high_resolution_clock::now();
 		std::cout << "B = " << B << ": " << std::chrono::duration<double>(end - start).count() << " s\n";
     } */
