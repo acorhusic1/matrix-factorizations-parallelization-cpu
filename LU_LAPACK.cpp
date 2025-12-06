@@ -16,7 +16,7 @@ extern "C" {
 
 
 int main() {
-    int n = 8192;
+    int n = 4096;
     
     std::vector<double> A(1LL * n * n);
 

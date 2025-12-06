@@ -8,7 +8,6 @@
 #include <vector>
 #include <algorithm>
 #include <cstring>
-#include <immintrin.h> // za AVX instrukcije
 
 void LU_naivna(double* A, double* L, double* U, int n) {
 	for (int i = 0; i < n; i++) {
@@ -418,11 +417,141 @@ void LU_blokovska_V1_omp(double* A, double* L, double* U, int n) {
     }
 }
 
-
-
+void LU_blokovska_V2_omp(double* A, double* L, double* U, int n) {
+    const int B = 96;
+    
+    std::vector<double> A_work(n * n);
+    std::memcpy(A_work.data(), A, n * n * sizeof(double));
+    
+    // Paralelizovana inicijalizacija
+    #pragma omp parallel for
+    for (int i = 0; i < n * n; ++i) {
+        L[i] = 0.0;
+        U[i] = 0.0;
+    }
+    
+    for (int kb = 0; kb < n; kb += B) {
+        int kend = std::min(kb + B, n);
+        
+        // ========================
+        // 1) Dijagonalni blok - MORA biti sekvencijalno
+        // ========================
+        for (int k = kb; k < kend; ++k) {
+            int kn = k * n;
+            
+            // U red
+            for (int j = k; j < kend; ++j) {
+                double sum = 0.0;
+                for (int p = kb; p < k; ++p)
+                    sum += L[kn + p] * U[p * n + j];
+                U[kn + j] = A_work[kn + j] - sum;
+            }
+            
+            // L kolona
+            L[kn + k] = 1.0;
+            double inv_Ukk = 1.0 / U[kn + k];
+            for (int i = k + 1; i < kend; ++i) {
+                int in = i * n;
+                double sum = 0.0;
+                for (int p = kb; p < k; ++p)
+                    sum += L[in + p] * U[p * n + k];
+                L[in + k] = (A_work[in + k] - sum) * inv_Ukk;
+            }
+        }
+        
+        // ========================
+        // 2) U blokovi desno - PARALELIZOVANO po blokovima
+        // ========================
+        #pragma omp parallel for schedule(dynamic)
+        for (int colb = kend; colb < n; colb += B) {
+            int colend = std::min(colb + B, n);
+            for (int k = kb; k < kend; ++k) {
+                int kn = k * n;
+                
+                // Loop unrolling - 4 elementa odjednom
+                int j = colb;
+                for (; j + 3 < colend; j += 4) {
+                    double sum0 = 0.0, sum1 = 0.0, sum2 = 0.0, sum3 = 0.0;
+                    for (int p = kb; p < k; ++p) {
+                        double Lkp = L[kn + p];
+                        int pn = p * n;
+                        sum0 += Lkp * U[pn + j];
+                        sum1 += Lkp * U[pn + j + 1];
+                        sum2 += Lkp * U[pn + j + 2];
+                        sum3 += Lkp * U[pn + j + 3];
+                    }
+                    U[kn + j]     = A_work[kn + j]     - sum0;
+                    U[kn + j + 1] = A_work[kn + j + 1] - sum1;
+                    U[kn + j + 2] = A_work[kn + j + 2] - sum2;
+                    U[kn + j + 3] = A_work[kn + j + 3] - sum3;
+                }
+                
+                // Ostatak
+                for (; j < colend; ++j) {
+                    double sum = 0.0;
+                    for (int p = kb; p < k; ++p)
+                        sum += L[kn + p] * U[p * n + j];
+                    U[kn + j] = A_work[kn + j] - sum;
+                }
+            }
+        }
+        
+        // ========================
+        // 3) L blokovi ispod - PARALELIZOVANO po blokovima
+        // ========================
+        #pragma omp parallel for schedule(dynamic)
+        for (int rowb = kend; rowb < n; rowb += B) {
+            int rowend = std::min(rowb + B, n);
+            for (int k = kb; k < kend; ++k) {
+                int kn = k * n;
+                double inv_Ukk = 1.0 / U[kn + k];
+                for (int i = rowb; i < rowend; ++i) {
+                    int in = i * n;
+                    double sum = 0.0;
+                    for (int p = kb; p < k; ++p)
+                        sum += L[in + p] * U[p * n + k];
+                    L[in + k] = (A_work[in + k] - sum) * inv_Ukk;
+                }
+            }
+        }
+        
+        // ========================
+        // 4) Schur update - PARALELIZOVANO po blokovima
+        // ========================
+        const int SB = 64;
+        
+        #pragma omp parallel for collapse(2) schedule(dynamic)
+        for (int ib = kend; ib < n; ib += SB) {
+            for (int jb = kend; jb < n; jb += SB) {
+                int iend = std::min(ib + SB, n);
+                int jend = std::min(jb + SB, n);
+                
+                for (int p = kb; p < kend; ++p) {
+                    int pn = p * n;
+                    for (int i = ib; i < iend; ++i) {
+                        double Lip = L[i * n + p];
+                        int in = i * n;
+                        
+                        // Loop unrolling
+                        int j = jb;
+                        for (; j + 3 < jend; j += 4) {
+                            A_work[in + j]     -= Lip * U[pn + j];
+                            A_work[in + j + 1] -= Lip * U[pn + j + 1];
+                            A_work[in + j + 2] -= Lip * U[pn + j + 2];
+                            A_work[in + j + 3] -= Lip * U[pn + j + 3];
+                        }
+                        for (; j < jend; ++j) {
+                            A_work[in + j] -= Lip * U[pn + j];
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 int main() {
-	int n = 2048;
+	int n = 4096;
     
 	std::vector<double> A(1LL * n * n);
 	std::vector<double> L(1LL * n * n);
@@ -432,11 +561,11 @@ int main() {
 	for (int i = 0; i < n * n; i++)
 		A[i] = (rand() % 100) / 10.0 + 1.0;
 
-    // --- LU_naivna ---
-	auto t0 = std::chrono::high_resolution_clock::now();
+	// --- LU_naivna ---
+    auto t0_naivna = std::chrono::steady_clock::now();
 	LU_naivna(A.data(), L.data(), U.data(), n);
-	auto t1 = std::chrono::high_resolution_clock::now();
-	std::cout << "LU_naivna: " << std::chrono::duration<double>(t1 - t0).count() << " s\n";
+	auto t1_naivna = std::chrono::steady_clock::now();
+	std::cout << "LU_naivna: " << std::chrono::duration<double>(t1_naivna - t0_naivna).count() << " s\n";
     /* if (checkLU(A, L, U, n)) 
         std::cout << "LU_naivna verification: PASS\n";
     else 
@@ -444,10 +573,10 @@ int main() {
 
 	// --- LU_optimizovana ---
 	std::vector<double> A2 = A, L2(n * n), U2(n * n);
-	t0 = std::chrono::high_resolution_clock::now();
+	auto t0_opt = std::chrono::steady_clock::now();
 	LU_optimizovana(A2.data(), L2.data(), U2.data(), n);
-	t1 = std::chrono::high_resolution_clock::now();
-	std::cout << "LU_optimizovana: " << std::chrono::duration<double>(t1 - t0).count() << " s\n";
+	auto t1_opt = std::chrono::steady_clock::now();
+	std::cout << "LU_optimizovana: " << std::chrono::duration<double>(t1_opt - t0_opt).count() << " s\n";
     /* if (checkLU(A2, L2, U2, n)) 
         std::cout << "LU_optimizovana verification: PASS\n";
     else 
@@ -455,44 +584,72 @@ int main() {
 
 	// --- LU_blokovska_V1 ---
 	std::vector<double> A3 = A, L3(n * n), U3(n * n);
-	t0 = std::chrono::high_resolution_clock::now();
+	auto t0_b1 = std::chrono::steady_clock::now();
 	LU_blokovska_V1(A3.data(), L3.data(), U3.data(), n);
-	t1 = std::chrono::high_resolution_clock::now();
-	std::cout << "LU_blokovska_V1: " << std::chrono::duration<double>(t1 - t0).count() << " s\n";
+	auto t1_b1 = std::chrono::steady_clock::now();
+	std::cout << "LU_blokovska_V1: " << std::chrono::duration<double>(t1_b1 - t0_b1).count() << " s\n";
     
     /*if (checkLU(A3, L3, U3, n))
         std::cout << "LU_blokovska_V1 verification: PASS\n";
     else 
         std::cout << "LU_blokovska_V1 verification: FAIL\n";*/
 
-
+	// --- LU_blokovska_V2 ---
     std::vector<double> A4 = A, L4(n * n), U4(n * n);
-	t0 = std::chrono::high_resolution_clock::now();
+	auto t0_b2 = std::chrono::steady_clock::now();
 	LU_blokovska_V2(A4.data(), L4.data(), U4.data(), n);
-	t1 = std::chrono::high_resolution_clock::now();
-	std::cout << "LU_blokovska_V2: " << std::chrono::duration<double>(t1 - t0).count() << " s\n";
-    /* if (checkLU(A4, L4, U4, n))
-        std::cout << "LU_optimizirana verification: PASS\n";
+	auto t1_b2 = std::chrono::steady_clock::now();
+	std::cout << "LU_blokovska_V2: " << std::chrono::duration<double>(t1_b2 - t0_b2).count() << " s\n";
+    /*if (checkLU(A4, L4, U4, n))
+        std::cout << "LU_blokovska_V2 verification: PASS\n";
     else 
-        std::cout << "LU_optimizirana verification: FAIL\n"; */
+        std::cout << "LU_blokovska_V2 verification: FAIL\n";*/
 
-
+    // --- LU_blokovska_V1_omp ---
     std::vector<double> A5 = A, L5(n * n), U5(n * n);
-	t0 = std::chrono::high_resolution_clock::now();
+	auto t0_b1omp = std::chrono::steady_clock::now();
 	LU_blokovska_V1_omp(A5.data(), L5.data(), U5.data(), n);
-	t1 = std::chrono::high_resolution_clock::now();
-	std::cout << "LU_blokovska_V1_omp: " << std::chrono::duration<double>(t1 - t0).count() << " s\n";
+	auto t1_b1omp = std::chrono::steady_clock::now();
+	std::cout << "LU_blokovska_V1_omp: " << std::chrono::duration<double>(t1_b1omp - t0_b1omp).count() << " s\n";
     
-    /* if (checkLU(A5, L5, U5, n))
+   /*if (checkLU(A5, L5, U5, n))
         std::cout << "LU_blokovska_V1_omp verification: PASS\n";
     else 
-        std::cout << "LU_blokovska_V1_omp verification: FAIL\n"; */
+        std::cout << "LU_blokovska_V1_omp verification: FAIL\n";*/
 
-	/* for (int B : {16, 32, 64, 96, 128, 256}) {
+    // --- LU_blokovska_V2_omp ---
+    std::vector<double> A6 = A, L6(n * n), U6(n * n);
+	auto t0_b2omp = std::chrono::steady_clock::now();
+	LU_blokovska_V2_omp(A6.data(), L6.data(), U6.data(), n);
+	auto t1_b2omp = std::chrono::steady_clock::now();
+	std::cout << "LU_blokovska_V2_omp: " << std::chrono::duration<double>(t1_b2omp - t0_b2omp).count() << " s\n";
+    
+	/*if (checkLU(A6, L6, U6, n))
+        std::cout << "LU_blokovska_V2_omp verification: PASS\n";
+    else 
+        std::cout << "LU_blokovska_V2_omp verification: FAIL\n";*/
+    
+    /* for (int B : {16, 32, 64, 96, 128, 256}) {
 		auto start = std::chrono::high_resolution_clock::now();
 		LU_blokovska_V1(A.data(), L.data(), U.data(), n, B);
 		auto end = std::chrono::high_resolution_clock::now();
 		std::cout << "B = " << B << ": " << std::chrono::duration<double>(end - start).count() << " s\n";
     } */
+       // ===================== SPEEDUP =====================
+    double T_naivna = std::chrono::duration<double>(t1_naivna - t0_naivna).count();
+    double T_opt    = std::chrono::duration<double>(t1_opt    - t0_opt).count();
+    double T_b1     = std::chrono::duration<double>(t1_b1     - t0_b1).count();
+    double T_b2     = std::chrono::duration<double>(t1_b2     - t0_b2).count();
+    double T_b1omp  = std::chrono::duration<double>(t1_b1omp  - t0_b1omp).count();
+    double T_b2omp  = std::chrono::duration<double>(t1_b2omp  - t0_b2omp).count();
+
+    std::cout << "\n===== SPEEDUP (T1 = LU_naivna) =====\n";
+    std::cout << "Speedup_optimizovana    = " << T_naivna / T_opt   << "\n";
+    std::cout << "Speedup_blokovska_V1    = " << T_naivna / T_b1    << "\n";
+    std::cout << "Speedup_blokovska_V2    = " << T_naivna / T_b2    << "\n";
+    std::cout << "Speedup_blokovska_V1_omp= " << T_naivna / T_b1omp << "\n";
+    std::cout << "Speedup_blokovska_V2_omp= " << T_naivna / T_b2omp << "\n";
+    std::cout << "====================================\n";
+
 	return 0;
 }
