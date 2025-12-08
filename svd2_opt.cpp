@@ -614,6 +614,6 @@ int main() {
   {
     // warm up
   }
-  run_test(1000, 1000);
+  run_test(1500, 1500);
   return 0;
 }

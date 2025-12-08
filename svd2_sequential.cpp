@@ -841,7 +841,7 @@ int main() {
   std::cout << "Optimizations: Thin-QR Preprocessing, Padded Columns, Restrict "
                "Pointers\n";
 
-  run_test(1000, 1000); // Uncomment for long test
+  run_test(1500, 1500); // Uncomment for long test
 
   return 0;
 }

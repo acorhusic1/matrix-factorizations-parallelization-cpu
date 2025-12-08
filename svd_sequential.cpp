@@ -536,7 +536,7 @@ int main(int argc, char **argv) {
   // --- Heavy Performance Tests ---
   std::cout << "\n[PERFORMANCE TESTS]" << std::endl;
   auto start = std::chrono::high_resolution_clock::now();
-  run_heavy_test(1000, 1000, RANDOM, "Large Cache Breaker");
+  run_heavy_test(1500, 1500, RANDOM, "Large Cache Breaker");
   double time = std::chrono::duration<double>(
                     std::chrono::high_resolution_clock::now() - start)
                     .count();

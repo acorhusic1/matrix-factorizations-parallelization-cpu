@@ -508,7 +508,7 @@ int main(int argc, char **argv) {
   // CRITICAL: Limit threads to physical cores to reduce cache thrashing
   omp_set_num_threads(4);
 
-  int N = 1000;
+  int N = 1500;
   if (argc > 1)
     N = std::atoi(argv[1]);
 

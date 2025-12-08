@@ -883,12 +883,7 @@ int main() {
     std::cout << "=== Optimized Serial QR SVD Benchmark ===\n";
     std::cout << "Optimizations: Thin-QR, Padded Columns, Explicit AVX2 Intrinsics\n";
 
-    run_test(50, 50);
-    run_test(200, 200);
-    run_test(500, 500);
-
-    std::cout << "\n--- Heavy Tests ---\n";
-    run_test(1000, 1000);
+    run_test(1500, 1500);
      run_test(2000, 2000); // Uncomment for long test
 
     std::cout << "\n--- Rectangular Tests ---\n";

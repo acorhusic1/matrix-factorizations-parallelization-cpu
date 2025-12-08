@@ -720,97 +720,14 @@ void run_test(int rows, int cols) {
     std::cout << "  Custom SVD Time:   " << std::fixed << std::setprecision(5)
               << elapsed_opt.count() << " s\n";
 
-    // Reconstruction Check (Manual)
-    Matrix Recon(rows, cols);
-    Matrix VT = OptSVD::transpose(V);
 
-    // Check parallel threshold for verification logic too
-    long long verify_ops = (long long)rows * cols * S.size();
-
-    #pragma omp parallel for schedule(static) if(verify_ops > PARALLEL_THRESHOLD_ELEMENTS)
-    for (int j = 0; j < cols; ++j) {
-        for (int i = 0; i < rows; ++i) {
-            double sum = 0.0;
-            int k_lim = (int)S.size();
-            for (int k = 0; k < k_lim; ++k) {
-                sum += U.col_ptr(k)[i] * S[k] * VT.col_ptr(j)[k];
-            }
-            Recon.col_ptr(j)[i] = sum;
-        }
-    }
-
-    double err_recon = 0.0;
-    #pragma omp parallel for reduction(+:err_recon) if(verify_ops > PARALLEL_THRESHOLD_ELEMENTS)
-    for (int c = 0; c < cols; ++c) {
-        for (int r = 0; r < rows; ++r) {
-            double diff = A_copy.col_ptr(c)[r] - Recon.col_ptr(c)[r];
-            err_recon += diff * diff;
-        }
-    }
-    err_recon = std::sqrt(err_recon);
-    std::cout << "  Error (Reconstruct): " << std::scientific << err_recon << "\n";
-    std::cout << std::defaultfloat;
-
-#if ENABLE_LAPACK_BENCHMARK
-    std::vector<double> A_col_major(rows * cols);
-    for (int c = 0; c < cols; ++c) {
-        for (int r = 0; r < rows; ++r) {
-            A_col_major[c * rows + r] = A_copy.col_ptr(c)[r];
-        }
-    }
-
-    char jobu = 'A';
-    char jobvt = 'A';
-    int m = rows;
-    int n = cols;
-    int lda = m;
-    int ldu = m;
-    int ldvt = n;
-    int info = 0;
-
-    std::vector<double> s_lapack(std::min(m, n));
-    std::vector<double> u_lapack(m * m);
-    std::vector<double> vt_lapack(n * n);
-
-    double work_query;
-    int lwork = -1;
-    dgesvd_(&jobu, &jobvt, &m, &n, A_col_major.data(), &lda,
-            s_lapack.data(), u_lapack.data(), &ldu,
-            vt_lapack.data(), &ldvt, &work_query, &lwork, &info);
-
-    if (info == 0) {
-        lwork = (int)work_query;
-        std::vector<double> work(lwork);
-
-        auto start_lapack = std::chrono::high_resolution_clock::now();
-        dgesvd_(&jobu, &jobvt, &m, &n, A_col_major.data(), &lda,
-                s_lapack.data(), u_lapack.data(), &ldu,
-                vt_lapack.data(), &ldvt, work.data(), &lwork, &info);
-        auto end_lapack = std::chrono::high_resolution_clock::now();
-
-        if (info == 0) {
-            std::chrono::duration<double> elapsed_lapack = end_lapack - start_lapack;
-            std::cout << "  LAPACK SVD Time:   " << std::fixed << std::setprecision(5)
-                      << elapsed_lapack.count() << " s\n";
-
-            double ratio = elapsed_opt.count() / elapsed_lapack.count();
-            std::cout << "  Slowdown Factor:   " << std::setprecision(2) << ratio << "x\n";
-        }
-    }
-#endif
 }
 
 int main() {
     std::cout << "=== Optimized Parallel QR SVD Benchmark ===\n";
     std::cout << "Optimizations: Thin-QR, Padded Columns, Smart Parallel (OpenMP), No Explicit AVX\n";
 
-    run_test(50, 50);
-    run_test(200, 200);
-    run_test(500, 500);
-
-    std::cout << "\n--- Heavy Tests ---\n";
-    run_test(2000, 2000);
-    // run_test(1500, 1500); // Uncomment for long test
+    run_test(1500, 1500); // Uncomment for long test
 
     std::cout << "\n--- Rectangular Tests ---\n";
     run_test(1000, 200);

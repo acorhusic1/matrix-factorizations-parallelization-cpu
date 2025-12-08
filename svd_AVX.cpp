@@ -588,7 +588,7 @@ int main(int argc, char **argv) {
 
   // --- Heavy Performance Tests ---
   std::cout << "\n[PERFORMANCE TESTS]" << std::endl;
-  run_heavy_test(1000, 1000, RANDOM, "Large Cache Breaker");
+  run_heavy_test(1500, 1500, RANDOM, "Large Cache Breaker");
 
   return 0;
 }
