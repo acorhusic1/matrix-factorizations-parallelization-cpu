@@ -22,8 +22,8 @@ U `LU.cpp` implementirane su funkcije:
 - `LU_optimizovana` – optimizovana verzija sa manjim brojem ponavljanja i direktnim pristupom memoriji.  
 - `LU_blokovska_V1` i `LU_blokovska_V2` – blokovske verzije, koje koriste **Schur update** i blokiranje za bolje iskorištavanje cache memorije.  
 - `LU_blokovska_V1_omp` – paralelizovana verzija blokovske implementacije koristeći **OpenMP**.
-- `LU_blokovska_V1_omp` – verzija blokovske implementacije koristeći **SIMD**.  
-- `LU_blokovska_V1_omp` – paralelizovana verzija blokovske implementacije koristeći **OpenMP** + **SIMD**.  
+- `LU_blokovska_V2_simd` – verzija blokovske implementacije koristeći **SIMD**.  
+- `LU_blokovska_V2_omp_simd` – paralelizovana verzija blokovske implementacije koristeći **OpenMP** + **SIMD**.  
 
 - `checkLU` – funkcija koja provjerava ispravnost faktorizacije (`A = L*U`).  
 
