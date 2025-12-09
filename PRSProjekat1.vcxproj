@@ -48,7 +48,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>Intel C++ Compiler 2025</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -116,23 +116,30 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <Optimization>MaxSpeedHighLevel</Optimization>
+      <AdditionalIncludeDirectories>C:\libs\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>C:\libs\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>libopenblas.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="QR_naivna.cpp" />
-    <ClCompile Include="QR_sekvencijalna.cpp" />
-    <ClCompile Include="QR_sekvencijalna.h" />
-    <ClCompile Include="QR_sekvencijalna_blokirana.cpp" />
+    <ClCompile Include="QR_paralelna_blokovska.cpp" />
+    <ClCompile Include="QR_sekvencijalna_blokovska.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="cblas.h" />
+    <ClInclude Include="lapack.h" />
+    <ClInclude Include="lapacke.h" />
     <ClInclude Include="QR_naivna.h" />
-    <ClInclude Include="QR_sekvencijalna_blokirana.h" />
+    <ClInclude Include="QR_paralelna_blokovska.h" />
+    <ClInclude Include="QR_sekvencijalna_blokovska.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

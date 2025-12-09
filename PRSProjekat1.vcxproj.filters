@@ -18,16 +18,13 @@
     <ClCompile Include="QR_naivna.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="QR_sekvencijalna.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="QR_sekvencijalna.h">
-      <Filter>Header Files</Filter>
-    </ClCompile>
-    <ClCompile Include="QR_sekvencijalna_blokirana.cpp">
+    <ClCompile Include="QR_sekvencijalna_blokovska.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="QR_paralelna_blokovska.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -35,7 +32,19 @@
     <ClInclude Include="QR_naivna.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="QR_sekvencijalna_blokirana.h">
+    <ClInclude Include="QR_sekvencijalna_blokovska.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cblas.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lapack.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lapacke.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="QR_paralelna_blokovska.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
